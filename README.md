@@ -1,5 +1,4 @@
 # VBA
-The program I wrote to grab data from different Excel workbooks/workpages and fill in a report template.
 
 At my job at school, after each semester, numbers are collected and displayed in a report.
 Instead of doing it manually, I wrote a program in Excel and made it user-friendly by adding a button that users can use to run the program. 
