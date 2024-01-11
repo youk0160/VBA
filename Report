@@ -1,0 +1,143 @@
+'must be public so this variable can be used in semesterForm (user form)
+Public semester As String
+Public yr As String
+Dim activeWS As Worksheet
+
+Sub Report()
+    Dim cell As Range
+    Dim result As Integer
+    Dim resultUniq As Integer
+    Dim filterCol As Integer
+    Dim fillCols As String
+    Dim row As Integer
+    Dim WB1 As Workbook
+    Dim temp As Variant
+    
+    Set WB1 = ActiveWorkbook
+    
+    'make sure the variables are reset everytime code is ran
+    semester = ""
+    yr = ""
+    
+    'make sure we are looking at the Student Data Tab
+    Sheets("Student Data").Activate
+    Set activeWS = ActiveSheet
+    
+    'track the rows to fill in later
+    row = 6
+    
+    'input - what semester are we collecting data for
+    'semester = InputBox("Semester (Fall/Spring/Summer)")
+    semesterForm.Show
+    If semester = "" Then Exit Sub
+    'driver.findElementByName("PASSWORD").SendKeys pass
+    
+    'InStr checks for substring
+    'set the column range we will fill in
+    If InStr(1, LCase(semester), "fall") <> 0 Then
+        fillCols = "B C"
+    ElseIf InStr(1, LCase(semester), "spring") <> 0 Then
+        fillCols = "D E"
+    ElseIf InStr(1, LCase(semester), "summer") <> 0 Then
+        fillCols = "F G"
+    End If
+    
+    'loop through the rows we are collecting numbers for
+    'set the column we need to filter on the "Observation Report" and "Unique" tab OR filter
+    For Each cell In activeWS.Range("A7:A63")
+        row = row + 1
+        If InStr(1, LCase(cell), "total") <> 0 Or cell = "" Then
+            'no column set if it's a "total" or blank row
+        ElseIf InStr(1, LCase(cell), "class pres") <> 0 Then
+            'filterCol is 10 to distinguish this section from others
+            filterCol = 10
+        ElseIf InStr(1, LCase(cell), "counselor app") <> 0 Then
+            filterCol = 5
+        ElseIf InStr(1, LCase(cell), "visit r") <> 0 Then
+            filterCol = 8
+        ElseIf InStr(1, LCase(cell), "by class") <> 0 Then
+            filterCol = 4
+        ElseIf InStr(1, LCase(cell), "ment types") <> 0 Then
+            filterCol = 9
+        Else
+            'Class Presentations category has its own function for filter
+            If filterCol = 10 Then
+                temp = classroomPresFilter(LCase(cell))
+                result = temp(0)
+                resultUniq = temp(1)
+            Else
+                result = filter(cell.Value, Left(fillCols, 1), filterCol)
+                resultUniq = filter(cell.Value, Right(fillCols, 1), filterCol)
+            End If
+            WB1.Sheets("Student Data").Activate
+            Set activeWS = ActiveSheet
+            Range(Left(fillCols, 1) + CStr(row)).Value = result
+            Range(Right(fillCols, 1) + CStr(row)).Value = resultUniq
+        End If
+    Next cell
+End Sub
+
+'filters and return the total number
+'x is the string we are filtering for
+'column lets us know if we are looking at "Total" or "Unique"
+'filterCol is the column we are filtering either in "Observation Report" or "Unique" tab
+Function filter(x As String, column As String, filterCol As Integer) As Integer
+    'Total or Unique
+    If column = "B" Or column = "D" Or column = "F" Then
+        Sheets("Observation Report").Activate
+    Else: Sheets("Unique").Activate
+    End If
+    
+    Set activeWS = ActiveSheet
+
+    'clear out any existing filter
+    If ActiveSheet.FilterMode Then
+        ActiveSheet.ShowAllData
+    End If
+    
+    'filter and return the total #
+    activeWS.Range("A1").AutoFilter field:=filterCol, Criteria1:="*" & x & "*"
+    filter = WorksheetFunction.Subtotal(3, Range("A2:A1000"))
+End Function
+
+
+Function classroomPresFilter(rep As String) As Variant
+    Dim repName() As String
+    Dim result(0 To 1) As Variant
+    
+    If Dir("C:\Users\10849006\OneDrive - Utah Valley University\Career and Internship Center\Career Services\CDC Tracking Spreadsheets\Classroom Presentation Tracking.xlsx") <> "" Then
+        Workbooks.Open ("C:\Users\10849006\OneDrive - Utah Valley University\Career and Internship Center\Career Services\CDC Tracking Spreadsheets\Classroom Presentation Tracking.xlsx")
+        Sheets(semester + " " + yr).Activate
+        Set activeWS = ActiveSheet
+    Else
+        MsgBox "The file doesn't exist"
+        Exit Function
+    End If
+
+    'clear out any existing filter
+    If ActiveSheet.FilterMode Then
+        ActiveSheet.ShowAllData
+    End If
+    
+    'filter
+    If rep = "jumpstart orientation" Then
+        'jumpstart orient
+        activeWS.Range("A1").AutoFilter field:=2, Criteria1:=rep, Operator:=xlOr, Criteria2:="jumpstart"
+    ElseIf InStr(1, LCase(rep), "mult") <> 0 Then
+        'mult counselors - using three spaces " " to filter
+        activeWS.Range("A1").AutoFilter field:=4, Criteria1:="*" & " " & "*" & " " & "*" & " " & "*", Operator:=xlOr, Criteria2:="*" & "/" & "*"
+    ElseIf InStr(1, LCase(rep), "national") <> 0 Then
+        'NSE
+        activeWS.Range("A1").AutoFilter field:=6, Criteria1:="nse"
+    Else
+        'individual counselors
+        'split the rep name in case someone has their middle name included in their full name
+        repName() = Split(rep)
+        activeWS.Range("A1").AutoFilter field:=4, Criteria1:=repName(0) & "*" & repName(1)
+        activeWS.Range("A1").AutoFilter field:=2, Criteria1:="<>Jumpstart Orientation"
+    End If
+    
+    result(0) = WorksheetFunction.Subtotal(3, Range("D2:D1000"))
+    result(1) = WorksheetFunction.Subtotal(9, Range("E2:E1000"))
+    classroomPresFilter = result
+End Function
